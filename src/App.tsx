@@ -272,6 +272,20 @@ export default function App() {
     "idle" | "submitting" | "success" | "error"
   >("idle");
 
+  const [memberEditForm, setMemberEditForm] = useState({
+    id: 0,
+    name: "",
+    title: "Associate",
+    specialty: "",
+    status: "Active",
+    quote: "",
+    image: "",
+  });
+
+  const [memberEditStatus, setMemberEditStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
+
   const [bountyRequests, setBountyRequests] = useState<BountyRequest[]>([]);
   const [requestActionStatus, setRequestActionStatus] = useState<
     "idle" | "updating" | "success" | "error"
@@ -547,6 +561,104 @@ export default function App() {
       setMemberFormStatus("error");
     }
   };
+
+  const openMemberEditor = (member: Member) => {
+    setSelectedMember(member);
+    setMemberEditStatus("idle");
+    setMemberEditForm({
+      id: member.id,
+      name: member.name,
+      title: member.title,
+      specialty: member.specialty,
+      status: member.status,
+      quote: member.quote,
+      image: member.image ?? "",
+    });
+  };
+
+  const handleMemberEditChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setMemberEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleMemberUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setMemberEditStatus("submitting");
+
+    try {
+      const res = await fetch(CONTRACT_REQUEST_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8",
+        },
+        body: JSON.stringify({
+          action: "updateMember",
+          ...memberEditForm,
+        }),
+      });
+
+      const text = await res.text();
+      const data = JSON.parse(text);
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to update member");
+      }
+
+      setMembers((prev) =>
+        prev.map((member) =>
+          member.id === memberEditForm.id
+            ? {
+                ...member,
+                name: memberEditForm.name,
+                title: memberEditForm.title,
+                specialty: memberEditForm.specialty,
+                status: memberEditForm.status,
+                quote: memberEditForm.quote,
+                image: memberEditForm.image,
+              }
+            : member,
+        ),
+      );
+
+      setSelectedMember((prev) =>
+        prev && prev.id === memberEditForm.id
+          ? {
+              ...prev,
+              name: memberEditForm.name,
+              title: memberEditForm.title,
+              specialty: memberEditForm.specialty,
+              status: memberEditForm.status,
+              quote: memberEditForm.quote,
+              image: memberEditForm.image,
+            }
+          : prev,
+      );
+
+      setMemberEditStatus("success");
+    } catch (error) {
+      console.error("Failed to update member:", error);
+      setMemberEditStatus("error");
+    }
+  };
+
+  const sortedMembers = useMemo(() => {
+    const rankOrder: Record<string, number> = {
+      Director: 1,
+      "Assistant Director": 2,
+      Associate: 3,
+    };
+
+    return [...members].sort((a, b) => {
+      return (rankOrder[a.title] || 99) - (rankOrder[b.title] || 99);
+    });
+  }, [members]);
 
   const handleReviewRequest = async (
     requestTimestamp: string,
@@ -987,9 +1099,14 @@ export default function App() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleReviewRequest(request.timestamp, "Denied")
-                            }
+                            onClick={() => {
+                              if (confirm("Deny this bounty request?")) {
+                                handleReviewRequest(
+                                  request.timestamp,
+                                  "Denied",
+                                );
+                              }
+                            }}
                             disabled={requestActionStatus === "updating"}
                           >
                             Deny
@@ -1339,11 +1456,11 @@ export default function App() {
             </p>
 
             <div className="card-grid">
-              {members.map((member) => (
+              {sortedMembers.map((member) => (
                 <article
                   key={member.id}
                   className="info-card member-card"
-                  onClick={() => setSelectedMember(member)}
+                  onClick={() => openMemberEditor(member)}
                 >
                   <div className="member-header">
                     {member.image && member.image.trim() ? (
@@ -1576,6 +1693,90 @@ export default function App() {
 
             <blockquote>“{selectedMember.quote}”</blockquote>
 
+            {isAdmin && (
+              <form className="contract-form" onSubmit={handleMemberUpdate}>
+                <h3>Edit Member</h3>
+
+                <div className="contract-form-grid">
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Member name"
+                    value={memberEditForm.name}
+                    onChange={handleMemberEditChange}
+                    required
+                  />
+
+                  <select
+                    name="title"
+                    value={memberEditForm.title}
+                    onChange={handleMemberEditChange}
+                  >
+                    <option value="Associate">Associate</option>
+                    <option value="Assistant Director">
+                      Assistant Director
+                    </option>
+                    <option value="Director">Director</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    name="specialty"
+                    placeholder="Specialty"
+                    value={memberEditForm.specialty}
+                    onChange={handleMemberEditChange}
+                    required
+                  />
+
+                  <select
+                    name="status"
+                    value={memberEditForm.status}
+                    onChange={handleMemberEditChange}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Reserve">Reserve</option>
+                    <option value="Deployed">Deployed</option>
+                    <option value="Unavailable">Unavailable</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    name="image"
+                    placeholder="Image URL (optional)"
+                    value={memberEditForm.image}
+                    onChange={handleMemberEditChange}
+                  />
+                </div>
+
+                <textarea
+                  name="quote"
+                  placeholder="Quote"
+                  value={memberEditForm.quote}
+                  onChange={handleMemberEditChange}
+                  required
+                />
+
+                <button
+                  type="submit"
+                  disabled={memberEditStatus === "submitting"}
+                >
+                  {memberEditStatus === "submitting"
+                    ? "Saving..."
+                    : "Save Changes"}
+                </button>
+
+                {memberEditStatus === "success" && (
+                  <p className="contract-form-note">
+                    Member updated successfully.
+                  </p>
+                )}
+
+                {memberEditStatus === "error" && (
+                  <p className="contract-form-note">Failed to update member.</p>
+                )}
+              </form>
+            )}
+
             <button onClick={() => setSelectedMember(null)}>Close</button>
           </div>
         </div>
@@ -1624,9 +1825,11 @@ export default function App() {
               <div className="admin-bounty-actions">
                 <button
                   type="button"
-                  onClick={() =>
-                    handleBountyStatusUpdate(selectedBounty.id, "Completed")
-                  }
+                  onClick={() => {
+                    if (confirm("Mark this bounty as Completed?")) {
+                      handleBountyStatusUpdate(selectedBounty.id, "Completed");
+                    }
+                  }}
                   disabled={bountyActionStatus === "updating"}
                 >
                   {bountyActionStatus === "updating"
@@ -1636,9 +1839,11 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    handleBountyStatusUpdate(selectedBounty.id, "Cancelled")
-                  }
+                  onClick={() => {
+                    if (confirm("Cancel this bounty?")) {
+                      handleBountyStatusUpdate(selectedBounty.id, "Cancelled");
+                    }
+                  }}
                   disabled={bountyActionStatus === "updating"}
                 >
                   {bountyActionStatus === "updating"
