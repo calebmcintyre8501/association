@@ -88,6 +88,8 @@ function getRankBadgeClass(title?: string) {
   switch (title.toLowerCase()) {
     case "director":
       return "rank-badge director";
+    case "assistant director":
+      return "rank-badge assistant-director";
     case "associate":
       return "rank-badge associate";
     default:
@@ -100,9 +102,11 @@ function getRankSymbol(title?: string) {
 
   switch (title.toLowerCase()) {
     case "director":
-      return "✦";
+      return "✦"; // top
+    case "assistant director":
+      return "✧"; // mid-tier
     case "associate":
-      return "◆";
+      return "◆"; // base
     default:
       return "◆";
   }
@@ -1417,6 +1421,9 @@ export default function App() {
                     onChange={handleMemberChange}
                   >
                     <option value="Associate">Associate</option>
+                    <option value="Assistant Director">
+                      Assistant Director
+                    </option>
                     <option value="Director">Director</option>
                   </select>
 

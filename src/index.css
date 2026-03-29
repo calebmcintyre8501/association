@@ -1458,3 +1458,9 @@ blockquote {
   display: grid;
   gap: 0.85rem;
 }
+
+.rank-badge.assistant-director {
+  border: 1px solid #c084fc;
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.1);
+}
